@@ -16,7 +16,7 @@ nltk_stopwords = nltk.corpus.stopwords.words('english')
 nltk_stopwords += ["like", "gone", "did", "going", "would", "could", "get", "in", "up", "may", "wanter"]
 
 config = configparser.ConfigParser()
-config.read("paths.cfg")
+config.read("preprocess/paths.cfg")
 
 cpnet = None
 concept2id = None
@@ -60,10 +60,13 @@ def save_cpnet():
 
         for line in tqdm(lines, desc="saving to graph"):
             ls = line.strip().split('\t')
-            rel = relation2id[ls[0]]
-            subj = concept2id[ls[1]]
-            obj = concept2id[ls[2]]
+            rel = relation2id.get(ls[0], None)
+            subj = concept2id.get(ls[1], None)
+            obj = concept2id.get(ls[2], None)
             weight = float(ls[3])
+            if subj == None or rel == None or obj == None:
+                print("Not found:", ls)
+                continue
             if id2relation[rel] == "hascontext":
                 continue
             if not_save(ls[1]) or not_save(ls[2]):

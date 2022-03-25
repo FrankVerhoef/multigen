@@ -1,12 +1,17 @@
 import configparser
 import json
+from tqdm import tqdm
 
 relation_mapping = dict()
 
 
 def load_merge_relation():
+    """
+        This defines a mapping from the original Conceptnet relationship types to a reduced set of relationship types
+        This reduced set has been designed specifically for this task.
+    """
     config = configparser.ConfigParser()
-    config.read("paths.cfg")
+    config.read("preprocess/paths.cfg")
     with open(config["paths"]["merge_relation"], encoding="utf8") as f:
         for line in f.readlines():
             ls = line.strip().split('/')
@@ -36,11 +41,11 @@ def extract_english():
     :return:
     """
     config = configparser.ConfigParser()
-    config.read("paths.cfg")
+    config.read("preprocess/paths.cfg")
 
     only_english = []
     with open(config["paths"]["conceptnet"], encoding="utf8") as f:
-        for line in f.readlines():
+        for line in tqdm(f):
             ls = line.split('\t')
             if ls[2].startswith('/c/en/') and ls[3].startswith('/c/en/'):
                 """
@@ -72,6 +77,7 @@ def extract_english():
 
                 only_english.append("\t".join([rel, head, tail, str(data["weight"])]))
 
+    print("Found {} assertions that match with filter".format(len(only_english)))
     with open(config["paths"]["conceptnet_en"], "w", encoding="utf8") as f:
         f.write("\n".join(only_english))
 

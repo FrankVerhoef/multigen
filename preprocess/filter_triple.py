@@ -5,7 +5,7 @@ import configparser
 import sys
 
 config = configparser.ConfigParser()
-config.read("paths.cfg")
+config.read("preprocess/paths.cfg")
 
 def read_json(filename):
     data = []
@@ -107,6 +107,9 @@ def filter_directed_triple(data, max_concepts=200, max_triples=300):
 
 
 def bfs(start, triple_dict, source):
+    """
+        Perform breath-first-search (?)
+    """
     paths = [[[start]]]
     stop = False
     shortest_paths = []
@@ -136,7 +139,7 @@ def bfs(start, triple_dict, source):
 
 dataset = sys.argv[1]
 
-DATA_PATH = config["paths"][dataset + "_dir"]
+DATA_PATH = config["paths"][dataset]
 T = 2 
 max_B = 100
 

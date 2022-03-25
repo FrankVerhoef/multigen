@@ -16,7 +16,7 @@ from scipy import spatial
 import sys
 
 config = configparser.ConfigParser()
-config.read("paths.cfg")
+config.read("preprocess/paths.cfg")
 
 
 cpnet = None
@@ -50,6 +50,10 @@ def load_resources():
 
 
 def load_cpnet():
+    """
+        Create a simpler version of the graph.
+        In this graph multiple edges between the same nodes are combined (and weight added)
+    """
     global cpnet,concept2id, relation2id, id2relation, id2concept, cpnet_simple
     print("loading cpnet....")
     cpnet = nx.read_gpickle(config["paths"]["conceptnet_en_graph"])
@@ -73,7 +77,7 @@ def get_edge(src_concept, tgt_concept):
     
 
 
-
+# Currently not used
 def cosine_score_triple(h, t, r):
     global concept_embs, relation_embs
     #return np.linalg.norm(t-h-r)
@@ -84,27 +88,30 @@ def cosine_score_triple(h, t, r):
 
 
 def find_neighbours_frequency(source_sentence, source_concepts, target_concepts, T, max_B=100):
+    """
+        Find ...
+    """
     global cpnet, concept2id, relation2id, id2relation, id2concept, cpnet_simple, total_concepts_id
-    source = [concept2id[s_cpt] for s_cpt in source_concepts]
-    start = source
-    Vts = dict([(x,0) for x in start])
+    source = [concept2id[s_cpt] for s_cpt in source_concepts]  # id's of the source concepts
+    start = source                              # start init contains id's of source concepts
+    Vts = dict([(x,0) for x in start])          # Vts init contains start indices, with distance 0
     Ets = {}
     total_concepts_id_set = set(total_concepts_id)
-    for t in range(T):
+    for t in range(T):      # T is number of hops
         V = {}
         templates = []
         for s in start:
             if s in cpnet_simple:
-                for n in cpnet_simple[s]:
+                for n in cpnet_simple[s]:       # loops through the neighbors
                     if n not in Vts and n in total_concepts_id_set:
                         if n not in Vts:
-                            if n not in V:
+                            if n not in V:      # if not yet reached, add to 'V' with frequency
                                 V[n] = 1
                             else:
-                                V[n] += 1
+                                V[n] += 1       # if already reached, increase frequency
 
                         if n not in Ets:
-                            rels = get_edge(s, n)
+                            rels = get_edge(s, n)   # list of relation types between s and n
                             if len(rels) > 0:
                                 Ets[n] = {s: rels}  
                         else:
@@ -113,12 +120,14 @@ def find_neighbours_frequency(source_sentence, source_concepts, target_concepts,
                                 Ets[n].update({s: rels})  
                         
         
-        V = list(V.items())
-        count_V = sorted(V, key=lambda x: x[1], reverse=True)[:max_B]
-        start = [x[0] for x in count_V if x[0] in total_concepts_id_set]
+        V = list(V.items())         # convert from dict to list
+        count_V = sorted(V, key=lambda x: x[1], reverse=True)[:max_B] # select most frequently visited
+        start = [x[0] for x in count_V if x[0] in total_concepts_id_set] # update start to the newly visited nodes
         
+        # Add nodes to Vts, with distance increased by 1
         Vts.update(dict([(x, t+1) for x in start]))
     
+    # Unclear what the purpose is of these lines. Doesn't seem to change concepts & distances
     _concepts = list(Vts.keys())
     _distances = list(Vts.values())
     concepts = []
@@ -137,23 +146,27 @@ def find_neighbours_frequency(source_sentence, source_concepts, target_concepts,
                     triples.append((u, rels, v))
     
 
-    ts = [concept2id[t_cpt] for t_cpt in target_concepts]
+    ts = [concept2id[t_cpt] for t_cpt in target_concepts]   #id's of target concepts
 
     labels = []
     found_num = 0
-    for c in concepts:
+    for c in concepts:  # construct a list with labels; if the T-hop concept appears in target, then corresponding label is 1
         if c in ts:
             found_num += 1
             labels.append(1)
         else:
             labels.append(0)
     
-    res = [id2concept[x].replace("_", " ") for x in concepts]
+    res = [id2concept[x].replace("_", " ") for x in concepts]   # concept strings of concepts within T hops of source
     triples = [(id2concept[x].replace("_", " "), y, id2concept[z].replace("_", " ")) for (x,y,z) in triples]
 
     return {"concepts":res, "labels":labels, "distances":distances, "triples":triples}, found_num, len(res)
 
 def process(input_path, output_path, T, max_B):
+    """
+        input file contains a list of dicts, with src sentence, tgt sentence and the concepts in those sentences
+        Creates a dataset with examples which T-hop concepts are relevant for a given src-tgt sentence pair
+    """
     data = []
     with open(input_path, 'r') as f:
         for line in f.readlines():
@@ -161,8 +174,8 @@ def process(input_path, output_path, T, max_B):
     examples = []
     avg_len = 0
     for ex in tqdm(data):
-        target = ex['ac']
-        source = ex['qc']
+        target = ex['ac']   # concepts in the answer
+        source = ex['qc']   # concepts in the source
         
         e, found, avg_nodes = find_neighbours_frequency(ex['sent'], source, target, T, max_B)
         avg_len += avg_nodes
@@ -208,7 +221,7 @@ dataset = sys.argv[1]
 
 T = 2
 max_B = 100
-DATA_PATH = config["paths"][dataset + "_dir"]
+DATA_PATH = config["paths"][dataset]
 
 load_resources()
 load_cpnet()

@@ -10,6 +10,7 @@ import numpy as np
 import multiprocessing 
 import sys
 
+# How has this blacklist been determined ???
 blacklist = set(["from", "as", "more", "either", "in", "and", "on", "an", "when", "too", "to", "i", "do", "can", "be", "that", "or", "the", "a", "of", "for", "is", "was", "the", "-PRON-", "actually", "likely", "possibly", "want",
                  "make", "my", "someone", "sometimes_people", "sometimes","would", "want_to",
                  "one", "something", "sometimes", "everybody", "somebody", "could", "could_be","mine","us","em",
@@ -17,7 +18,11 @@ blacklist = set(["from", "as", "more", "either", "in", "and", "on", "an", "when"
 
 concept_vocab = set()
 config = configparser.ConfigParser()
-config.read("paths.cfg")
+config.read("preprocess/paths.cfg")
+for s in config.sections():
+    print(s)
+    for k,v in config[s].items():
+        print('\t', k,'\t', v)
 with open(config["paths"]["concept_vocab"], "r", encoding="utf8") as f:
     cpnet_vocab = [l.strip() for l in list(f.readlines())]
 cpnet_vocab = set([c.replace("_", " ") for c in cpnet_vocab])
@@ -25,6 +30,11 @@ cpnet_vocab = set([c.replace("_", " ") for c in cpnet_vocab])
 nlp = spacy.load('en_core_web_sm', disable=['ner', 'parser', 'textcat'])
 
 def hard_ground(sent):
+    """
+        Returns a list of (lemmatized) verbs and nouns in the input sentence
+        that also occur in the ConceptNet vocabulary and in the model vocabulary
+        and are not in the 'blacklist'
+    """
     global cpnet_vocab, model_vocab
     sent = sent.lower()
     doc = nlp(sent)
@@ -39,10 +49,15 @@ def hard_ground(sent):
     #    res.add(sent)
     return res
 
+# Currently not used
 def match(input):
     return match_mentioned_concepts(input[0], input[1])
 
 def match_mentioned_concepts(sents, answers):
+    """
+        Returns a list of dicts with sentence from source, sentence from answer and the concepts
+        from those sentences
+    """
     #global nlp
     #matcher = load_matcher(nlp)
 
@@ -62,6 +77,7 @@ def match_mentioned_concepts(sents, answers):
         res.append({"sent": s, "ans": a, "qc": list(question_concepts), "ac": list(answer_concepts)})
     return res
 
+# Currently not used
 def lemmatize(nlp, concept):
 
     doc = nlp(concept.replace("_"," "))
@@ -70,9 +86,10 @@ def lemmatize(nlp, concept):
     lcs.add("_".join([token.lemma_ for token in doc])) # all lemma
     return lcs
 
+# Currently not used
 def load_matcher(nlp):
     config = configparser.ConfigParser()
-    config.read("paths.cfg")
+    config.read("preprocess/paths.cfg")
     
     matcher = Matcher(nlp.vocab)
     for concept in cpnet_vocab:
@@ -81,6 +98,10 @@ def load_matcher(nlp):
     return matcher
 
 def grounding_sentences(src, tgt, type, path):
+    """
+        Create a file with lines that match concepts that are mentioned in src and tgt file
+        Result is a list of dicts, with sentence from src, sentence from tgt and concepts in those sentences
+    """
     
     #nlp.add_pipe(nlp.create_pipe('sentencizer'))
     res = match_mentioned_concepts(sents=src, answers=tgt)
@@ -91,8 +112,6 @@ def grounding_sentences(src, tgt, type, path):
             json.dump(line, f)
             f.write('\n')
 
-
-    
 
 def read_csv(data_path="train/source.csv"):
     data = []
@@ -107,7 +126,7 @@ def read_model_vocab(data_path):
     vocab_dict = json.loads(open(data_path, 'r').readlines()[0])
     model_vocab = []
     for tok in vocab_dict.keys():
-        model_vocab.append(tok[1:])
+        model_vocab.append(tok)  # In original, the first character is excluded; unclear why that is --> use complete word
     print(len(model_vocab))
 
 
